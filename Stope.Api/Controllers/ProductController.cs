@@ -24,6 +24,7 @@ namespace Stope.Api.Controllers
             var product = _productService.Get(id);
 
             var model = _mapper.Map<ProductViewModel>(product);
+            model.Status = 1;
 
             return model;
         }

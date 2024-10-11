@@ -11,7 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
-builder.Services.AddAutoMapper(typeof(MapperProfile), typeof(MapperProfileVM));
+builder.Services.AddAutoMapper(typeof(MapperModelProfile), typeof(MapperViewModelProfile));
 
 builder.Services.AddTransient<IOrderRepository, OrderRepository>();
 builder.Services.AddTransient<IProductRepository, ProductRepository>();
