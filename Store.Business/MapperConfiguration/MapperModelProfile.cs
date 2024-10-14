@@ -4,9 +4,9 @@ using Store.Data.Entities;
 
 namespace Store.Business.MapperConfiguration
 {
-    public class MapperProfile : Profile
+    public class MapperModelProfile : Profile
     {
-        public MapperProfile()
+        public MapperModelProfile()
         {
             CreateMap<Order, OrderModel>()
                 .ForMember(dest => dest.PriceUah, opt => opt.MapFrom(src => src.Price))

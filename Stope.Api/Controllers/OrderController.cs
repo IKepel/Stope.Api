@@ -24,6 +24,7 @@ namespace Stope.Api.Controllers
             var order = _orderService.Get(id);
 
             var model = _mapper.Map<OrderViewModel>(order);
+            model.Status = 1;
 
             return model;
         }
