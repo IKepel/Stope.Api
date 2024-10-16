@@ -14,10 +14,10 @@ builder.Services.AddControllers();
 builder.Services.AddAutoMapper(typeof(MapperModelProfile), typeof(MapperViewModelProfile));
 
 builder.Services.AddTransient<IOrderRepository, OrderRepository>();
-builder.Services.AddTransient<IProductRepository, ProductRepository>();
+builder.Services.AddTransient<IBookRepository, BookRepository>();
 
 builder.Services.AddTransient<IOrderService, OrderService>();
-builder.Services.AddTransient<IProductService, ProductService>();
+builder.Services.AddTransient<IBookService, BookService>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

@@ -1,11 +1,12 @@
-﻿using Store.Data.Common;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Store.Data.Entities
+namespace Store.Data.Requests
 {
-    public class Order : BaseEntity
+    public class UpsertOrderRequestModel
     {
+        public int? Id { get; set; }
+
         [Required]
         public DateTime OrderDate { get; set; }
 
@@ -15,9 +16,5 @@ namespace Store.Data.Entities
 
         [Required]
         public int UserId { get; set; }
-
-        public virtual User User { get; set; }
-
-        public virtual ICollection<OrderItem> OrderItems { get; set; }
     }
 }

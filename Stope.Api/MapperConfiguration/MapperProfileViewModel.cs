@@ -12,7 +12,7 @@ namespace Stope.Api.MapperConfiguration
         {
             CreateMap<OrderModel, OrderViewModel>();
 
-            CreateMap<ProductModel, ProductViewModel>();
+            CreateMap<BookModel, BookViewModel>();
         }
     }
 }

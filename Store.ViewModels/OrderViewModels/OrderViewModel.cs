@@ -3,10 +3,17 @@
     public class OrderViewModel
     {
         public int Id { get; set; }
-        public int ProductId { get; set; }
-        public double PriceUah { get; set; }
-        public double PriceUsd { get; set; }
-        public double PriceEuro { get; set; }
+
+        public DateTime OrderDate { get; set; }
+
+        public decimal TotalAmount { get; set; }
+
+        public int UserId { get; set; }
+
+        //public virtual User User { get; set; }
+
+        //public virtual ICollection<OrderItem> OrderItems { get; set; }
+
         public int Status { get; set; }
     }
 }

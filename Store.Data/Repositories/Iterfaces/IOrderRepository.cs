@@ -4,8 +4,10 @@ namespace Store.Data.Repositories.Iterfaces
 {
     public interface IOrderRepository
     {
-        Order Get(int id);
-        IEnumerable<Order> Get();
-        int Create();
+        Task<Order> Get(int id);
+        Task<IEnumerable<Order>> Get();
+        Task<int> Create(Order order);
+        Task<Order> Update(Order order);
+        Task<int> Delete(int id);
     }
 }
