@@ -1,7 +1,8 @@
 using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
+using Stope.Api.Models.Requests;
+using Store.Business.Models.Orders;
 using Store.Business.Services.Interfaces;
-using Store.Data.Requests;
 using Store.ViewModels.OrderViewModels;
 
 namespace Stope.Api.Controllers
@@ -20,17 +21,19 @@ namespace Stope.Api.Controllers
         }
 
         [HttpPost]
-        public async Task<int> Create(UpsertOrderRequestModel order)
+        public async Task<int> Create([FromBody] OrderRequestModel order)
         {
-            return await _orderService.Create(order);
+            var model = _mapper.Map<OrderModel>(order);
+
+            return await _orderService.Create(model);
         }
 
         [HttpGet("{id}")]
         public async Task<OrderViewModel> Get(int id)
         {
-            var order = await _orderService.Get(id);
+            var orderDto = await _orderService.Get(id);
 
-            var model = _mapper.Map<OrderViewModel>(order);
+            var model = _mapper.Map<OrderViewModel>(orderDto);
             model.Status = 1;
 
             return model;
@@ -39,9 +42,9 @@ namespace Stope.Api.Controllers
         [HttpGet]
         public async Task<IEnumerable<OrderViewModel>> Get()
         {
-            var orders = await _orderService.Get();
+            var orderDtos = await _orderService.Get();
 
-            var models = _mapper.Map<IEnumerable<OrderViewModel>>(orders);
+            var models = _mapper.Map<IEnumerable<OrderViewModel>>(orderDtos);
 
             foreach (var model in models)
             {
@@ -57,15 +60,18 @@ namespace Stope.Api.Controllers
             return await _orderService.Delete(id);
         }
 
-        [HttpPut("[action]")]
-        public async Task<OrderViewModel> Update(UpsertOrderRequestModel orderModel)
+        [HttpPut("{id}")]
+        public async Task<OrderViewModel> Update(int id, [FromBody] OrderRequestModel orderModel)
         {
-            var order = await _orderService.Update(orderModel);
+            orderModel.Id = id;
+            var model = _mapper.Map<OrderModel>(orderModel);
 
-            var model = _mapper.Map<OrderViewModel>(order);
-            model.Status = 1;
+            var order = await _orderService.Update(model);
 
-            return model;
+            var viewModel = _mapper.Map<OrderViewModel>(order);
+            viewModel.Status = 1;
+
+            return viewModel;
         }
     }
 }

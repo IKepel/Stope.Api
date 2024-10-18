@@ -1,4 +1,6 @@
-﻿namespace Store.ViewModels.OrderViewModels
+﻿using Store.ViewModels.OrderItemViewModels;
+
+namespace Store.ViewModels.OrderViewModels
 {
     public class OrderViewModel
     {
@@ -10,9 +12,7 @@
 
         public int UserId { get; set; }
 
-        //public virtual User User { get; set; }
-
-        //public virtual ICollection<OrderItem> OrderItems { get; set; }
+        public List<OrderItemViewModel> OrderItems { get; set; }
 
         public int Status { get; set; }
     }

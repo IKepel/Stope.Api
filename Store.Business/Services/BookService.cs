@@ -1,9 +1,9 @@
 ﻿using AutoMapper;
-using Store.Business.Models.Products;
+using Store.Business.Models.Books;
 using Store.Business.Services.Interfaces;
+using Store.Data.Dtos;
 using Store.Data.Entities;
 using Store.Data.Repositories.Iterfaces;
-using Store.Data.Requests;
 
 namespace Store.Business.Services
 {
@@ -18,9 +18,10 @@ namespace Store.Business.Services
             _mapper = mapper;
         }
 
-        public async Task<int> Create(UpsertBookRequestModel bookModel)
+        public async Task<int> Create(BookModel bookModel)
         {
             var book = _mapper.Map<Book>(bookModel);
+
             return await _bookRepository.Create(book);
         }
 
@@ -29,33 +30,33 @@ namespace Store.Business.Services
             return await _bookRepository.Delete(id);
         }
 
-        public async Task<BookModel> Get(int id)
+        public async Task<BookDto> Get(int id)
         {
             var book = await _bookRepository.Get(id);
 
-            var model = _mapper.Map<BookModel>(book);
+            var bookDto = _mapper.Map<BookDto>(book);
 
-            return model;
+            return bookDto;
         }
 
-        public async Task<IEnumerable<BookModel>> Get()
+        public async Task<IEnumerable<BookDto>> Get()
         {
             var bookList = await _bookRepository.Get();
 
-            var models = _mapper.Map<IEnumerable<BookModel>>(bookList);
+            var bookDtos = _mapper.Map<IEnumerable<BookDto>>(bookList);
 
-            return models;
+            return bookDtos;
         }
 
-        public async Task<BookModel> Update(UpsertBookRequestModel bookModel)
+        public async Task<BookDto> Update(BookModel bookModel)
         {
             var book = _mapper.Map<Book>(bookModel);
 
             book = await _bookRepository.Update(book);
 
-            var model = _mapper.Map<BookModel>(book);
+            var bookDto = _mapper.Map<BookDto>(book);
 
-            return model;
+            return bookDto;
         }
     }
 }

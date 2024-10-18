@@ -1,17 +1,17 @@
 ﻿using Store.Business.Models.Orders;
-using Store.Data.Requests;
+using Store.Data.Dtos;
 
 namespace Store.Business.Services.Interfaces
 {
     public interface IOrderService
     {
-        Task<OrderModel> Get(int id);
+        Task<OrderDto> Get(int id);
 
-        Task<IEnumerable<OrderModel>> Get();
+        Task<IEnumerable<OrderDto>> Get();
 
-        Task<int> Create(UpsertOrderRequestModel orderModel);
+        Task<int> Create(OrderModel orderModel);
 
-        Task<OrderModel> Update(UpsertOrderRequestModel orderModel);
+        Task<OrderDto> Update(OrderModel orderModel);
 
         Task<int> Delete(int id);
     }

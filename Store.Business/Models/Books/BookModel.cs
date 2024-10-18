@@ -1,8 +1,6 @@
-﻿using Store.Data.Entities;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.ComponentModel.DataAnnotations;
+﻿using Store.Business.Models.BookDetails;
 
-namespace Store.Business.Models.Products
+namespace Store.Business.Models.Books
 {
     public class BookModel
     {
@@ -16,14 +14,10 @@ namespace Store.Business.Models.Products
 
         public DateTime PublishedDate { get; set; }
 
-        //public virtual ICollection<Author> Authors { get; set; }
+        public List<int> AuthorIds { get; set; }
 
-        //public virtual ICollection<Category> Categories { get; set; }
+        public List<int> CategoryIds { get; set; }
 
-        //public virtual ICollection<BookDetail> BookDetails { get; set; }
-
-        //public virtual ICollection<OrderItem> OrderItems { get; set; }
-
-
+        public List<BookDetailModel> BookDetails { get; set; }
     }
 }

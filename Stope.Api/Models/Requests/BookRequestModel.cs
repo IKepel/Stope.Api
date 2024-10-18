@@ -1,11 +1,11 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Store.Data.Requests
+namespace Stope.Api.Models.Requests
 {
-    public class UpsertBookRequestModel
+    public class BookRequestModel
     {
-        public int? Id { get; set; }
+        public int Id { get; set; }
 
         [Required]
         [StringLength(250)]
@@ -21,5 +21,14 @@ namespace Store.Data.Requests
 
         [Required]
         public DateTime PublishedDate { get; set; }
+
+        [Required]
+        public List<int> AuthorIds { get; set; }
+
+        [Required]
+        public List<int> CategoryIds { get; set; }
+
+        [Required]
+        public List<BookDetailRequestModel> BookDetails { get; set; }
     }
 }

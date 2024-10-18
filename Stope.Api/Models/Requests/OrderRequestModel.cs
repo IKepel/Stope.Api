@@ -1,11 +1,11 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace Store.Data.Requests
+namespace Stope.Api.Models.Requests
 {
-    public class UpsertOrderRequestModel
+    public class OrderRequestModel
     {
-        public int? Id { get; set; }
+        public int Id { get; set; }
 
         [Required]
         public DateTime OrderDate { get; set; }
@@ -16,5 +16,8 @@ namespace Store.Data.Requests
 
         [Required]
         public int UserId { get; set; }
+
+        [Required]
+        public List<OrderItemRequestModel> OrderItems { get; set; }
     }
 }

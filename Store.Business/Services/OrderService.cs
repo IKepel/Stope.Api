@@ -1,9 +1,9 @@
 ﻿using AutoMapper;
 using Store.Business.Models.Orders;
 using Store.Business.Services.Interfaces;
+using Store.Data.Dtos;
 using Store.Data.Entities;
 using Store.Data.Repositories.Iterfaces;
-using Store.Data.Requests;
 
 namespace Store.Business.Services
 {
@@ -18,9 +18,10 @@ namespace Store.Business.Services
             _mapper = mapper;
         }
 
-        public async Task<int> Create(UpsertOrderRequestModel orderModel)
+        public async Task<int> Create(OrderModel orderModel)
         {
             var order = _mapper.Map<Order>(orderModel);
+
             return await _orderRepository.Create(order);
         }
 
@@ -29,31 +30,31 @@ namespace Store.Business.Services
             return await _orderRepository.Delete(id);
         }
 
-        public async Task<OrderModel> Get(int id)
+        public async Task<OrderDto> Get(int id)
         {
             var order = await _orderRepository.Get(id);
 
-            var model = _mapper.Map<OrderModel>(order);
+            var orderDto = _mapper.Map<OrderDto>(order);
 
-            return model;
+            return orderDto;
         }
 
-        public async Task<IEnumerable<OrderModel>> Get()
+        public async Task<IEnumerable<OrderDto>> Get()
         {
             var orders = await _orderRepository.Get();
 
-            var models = _mapper.Map<IEnumerable<OrderModel>>(orders);
+            var orderDtos = _mapper.Map<IEnumerable<OrderDto>>(orders);
 
-            return models;
+            return orderDtos;
         }
 
-        public async Task<OrderModel> Update(UpsertOrderRequestModel orderModel)
+        public async Task<OrderDto> Update(OrderModel orderModel)
         {
             var order = _mapper.Map<Order>(orderModel);
 
             order = await _orderRepository.Update(order);
 
-            var model = _mapper.Map<OrderModel>(order);
+            var model = _mapper.Map<OrderDto>(order);
 
             return model;
         }

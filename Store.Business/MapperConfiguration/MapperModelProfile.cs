@@ -1,8 +1,10 @@
 ﻿using AutoMapper;
-using Store.Business.Models.Orders;
-using Store.Business.Models.Products;
 using Store.Data.Entities;
-using Store.Data.Requests;
+using Store.Business.Models.Books;
+using Store.Business.Models.BookDetails;
+using Store.Data.Dtos;
+using Store.Business.Models.Orders;
+using Store.Business.Models.OrderItems;
 
 namespace Store.Business.MapperConfiguration
 {
@@ -10,13 +12,20 @@ namespace Store.Business.MapperConfiguration
     {
         public MapperModelProfile()
         {
-            CreateMap<Order, OrderModel>();
-            CreateMap<Book, BookModel>();
-            CreateMap<UpsertBookRequestModel, Book>();
-            CreateMap<UpsertOrderRequestModel, Order>();
-                //.ForMember(dest => dest.PriceUah, opt => opt.MapFrom(src => src.Price))
-                //.ForMember(dest => dest.PriceUsd, opt => opt.MapFrom(src => src.Price * 41.5))
-                //.ForMember(dest => dest.PriceEuro, opt => opt.MapFrom(src => src.Price * 45))
+            CreateMap<OrderModel, Order>();
+            CreateMap<OrderItemModel, OrderItem>();
+            CreateMap<Order, OrderDto>();
+            CreateMap<OrderDto, Order>();
+
+            CreateMap<Book, BookDto>();
+            CreateMap<BookModel, Book>()
+                .ForMember(dest => dest.Authors, opt => opt.MapFrom(src => src.AuthorIds.Select(id => new Author { Id = id })))
+                .ForMember(dest => dest.Categories, opt => opt.MapFrom(src => src.CategoryIds.Select(id => new Category { Id = id })));
+            CreateMap<BookDetailModel, BookDetail>();
+            CreateMap<Author, AuthorDto>();  
+            CreateMap<Category, CategoryDto>();  
+            CreateMap<BookDetail, BookDetailDto>();  
+            CreateMap<OrderItem, OrderItemDto>();
         }
     }
 }

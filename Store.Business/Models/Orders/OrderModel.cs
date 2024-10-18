@@ -1,4 +1,8 @@
-﻿namespace Store.Business.Models.Orders
+﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
+using Store.Business.Models.OrderItems;
+
+namespace Store.Business.Models.Orders
 {
     public class OrderModel
     {
@@ -10,8 +14,6 @@
 
         public int UserId { get; set; }
 
-        //public virtual User User { get; set; }
-
-        //public virtual ICollection<OrderItem> OrderItems { get; set; }
+        public List<OrderItemModel> OrderItems { get; set; }
     }
 }

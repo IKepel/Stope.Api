@@ -1,7 +1,8 @@
 ﻿using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
+using Stope.Api.Models.Requests;
+using Store.Business.Models.Books;
 using Store.Business.Services.Interfaces;
-using Store.Data.Requests;
 using Store.ViewModels.ProductViewModels;
 
 namespace Stope.Api.Controllers
@@ -20,17 +21,19 @@ namespace Stope.Api.Controllers
         }
 
         [HttpPost]
-        public async Task<int> Create(UpsertBookRequestModel book)
+        public async Task<int> Create([FromBody] BookRequestModel book)
         {
-            return await _bookService.Create(book);
+            var model = _mapper.Map<BookModel>(book);
+
+            return await _bookService.Create(model);
         }
 
         [HttpGet("{id}")]
         public async Task<BookViewModel> Get(int id)
         {
-            var book = await _bookService.Get(id);
+            var bookDto = await _bookService.Get(id);
 
-            var model = _mapper.Map<BookViewModel>(book);
+            var model = _mapper.Map<BookViewModel>(bookDto);
             model.Status = 1;
 
             return model;
@@ -39,9 +42,9 @@ namespace Stope.Api.Controllers
         [HttpGet]
         public async Task<IEnumerable<BookViewModel>> Get()
         {
-            var bookList = await _bookService.Get();
+            var bookDtos = await _bookService.Get();
 
-            var models = _mapper.Map<IEnumerable<BookViewModel>>(bookList);
+            var models = _mapper.Map<IEnumerable<BookViewModel>>(bookDtos);
 
             foreach (var model in models)
             {
@@ -57,15 +60,18 @@ namespace Stope.Api.Controllers
             return await _bookService.Delete(id);
         }
 
-        [HttpPut("[action]")]
-        public async Task<BookViewModel> Update(UpsertBookRequestModel bookModel)
+        [HttpPut("{id}")]
+        public async Task<BookViewModel> Update(int id, [FromBody] BookRequestModel bookModel)
         {
-            var book = await _bookService.Update(bookModel);
+            bookModel.Id = id;
+            var model = _mapper.Map<BookModel>(bookModel);
 
-            var model = _mapper.Map<BookViewModel>(book);
-            model.Status = 1;
+            var book = await _bookService.Update(model);
 
-            return model;
+            var viewModel = _mapper.Map<BookViewModel>(book);
+            viewModel.Status = 1;
+
+            return viewModel;
         }
     }
 }
