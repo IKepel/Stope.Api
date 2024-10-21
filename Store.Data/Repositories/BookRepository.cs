@@ -2,7 +2,6 @@
 using Store.Data.Constants;
 using Store.Data.Entities;
 using Store.Data.Repositories.Iterfaces;
-using System.Reflection.PortableExecutable;
 
 namespace Store.Data.Repositories
 {
@@ -18,12 +17,11 @@ namespace Store.Data.Repositories
         public async Task<int> Create(Book book)
         {
             using SqlConnection connection = new(_connectionString);
-
-            await connection.OpenAsync();
-
             using SqlCommand command = new(SqlConstants.BookSqlConstants.INSERT_BOOK, connection);
 
             AddBookParameters(command, book);
+
+            await connection.OpenAsync();
 
             int bookId = (int)await command.ExecuteScalarAsync();
 
@@ -59,19 +57,24 @@ namespace Store.Data.Repositories
 
             using SqlDataReader reader = await command.ExecuteReaderAsync();
 
-            if (!await reader.ReadAsync()) return null;
-
-            var book = BookMapper.ReaderToBook(reader);
+            var book = new Book();
 
             while (await reader.ReadAsync())
             {
+                if (book.Id == 0)
+                {
+                    book.Id = Convert.ToInt32(reader["Id"]);
+                    book.Name = reader[$"{nameof(book.Name)}"].ToString();
+                    book.Description = reader[$"{nameof(book.Description)}"].ToString();
+                    book.Price = Convert.ToDecimal(reader[$"{nameof(book.Price)}"]);
+                    book.PublishedDate = Convert.ToDateTime(reader[$"{nameof(book.PublishedDate)}"]);
+                }
+
                 AddAuthors(reader, book);
 
                 AddCategoties(reader, book);
 
                 AddDetails(reader, book);
-
-                AddOrderItems(reader, book);
             }
 
             return book;
@@ -94,7 +97,14 @@ namespace Store.Data.Repositories
 
                 if (!bookDictionary.TryGetValue(bookId, out var book))
                 {
-                    book = BookMapper.ReaderToBook(reader);
+                    book = new Book
+                    {
+                        Id = bookId,
+                        Name = reader[$"{nameof(book.Name)}"].ToString(),
+                        Description = reader[$"{nameof(book.Description)}"].ToString(),
+                        Price = Convert.ToDecimal(reader[$"{nameof(book.Price)}"]),
+                        PublishedDate = Convert.ToDateTime(reader[$"{nameof(book.PublishedDate)}"]),
+                    };
 
                     bookDictionary.Add(bookId, book);
                 }
@@ -104,8 +114,6 @@ namespace Store.Data.Repositories
                 AddCategoties(reader, book);
 
                 AddDetails(reader, book);
-
-                AddOrderItems(reader, book);
             }
 
             return bookDictionary.Values;
@@ -154,10 +162,10 @@ namespace Store.Data.Repositories
 
         private void AddBookParameters(SqlCommand command, Book book)
         {
-            command.Parameters.AddWithValue("@Name", book.Name);
-            command.Parameters.AddWithValue("@Description", book.Description);
-            command.Parameters.AddWithValue("@Price", book.Price);
-            command.Parameters.AddWithValue("@PublishedDate", book.PublishedDate);
+            command.Parameters.AddWithValue($"@{nameof(book.Name)}", book.Name);
+            command.Parameters.AddWithValue($"@{nameof(book.Description)}", book.Description);
+            command.Parameters.AddWithValue($"@{nameof(book.Price)}", book.Price);
+            command.Parameters.AddWithValue($"@{nameof(book.PublishedDate)}", book.PublishedDate);
         }
 
         private void AddAuthors(SqlDataReader reader, Book book)
@@ -169,13 +177,12 @@ namespace Store.Data.Repositories
                 var author = new Author
                 {
                     Id = authorId,
-                    FirstName = reader["FirstName"].ToString(),
-                    LastName = reader["LastName"].ToString()
+                    FirstName = reader[$"{nameof(Author.FirstName)}"].ToString(),
+                    LastName = reader[$"{nameof(Author.LastName)}"].ToString()
                 };
 
                 book.Authors.Add(author);
             }
-
         }
 
         private void AddCategoties(SqlDataReader reader, Book book)
@@ -187,12 +194,11 @@ namespace Store.Data.Repositories
                 var category = new Category
                 {
                     Id = categoryId,
-                    Name = reader["CategoryName"].ToString()
+                    Name = reader[$"Category{nameof(Category.Name)}"].ToString()
                 };
 
                 book.Categories.Add(category);
             }
-
         }
 
         private void AddDetails(SqlDataReader reader, Book book)
@@ -204,33 +210,12 @@ namespace Store.Data.Repositories
                 var bookDetail = new BookDetail
                 {
                     Id = detailId,
-                    Language = reader["Language"].ToString(),
-                    PageCount = Convert.ToInt32(reader["PageCount"]),
-                    Publisher = reader["Publisher"].ToString()
+                    Language = reader[$"{nameof(BookDetail.Language)}"].ToString(),
+                    PageCount = Convert.ToInt32(reader[$"{nameof(BookDetail.PageCount)}"]),
+                    Publisher = reader[$"{nameof(BookDetail.Publisher)}"].ToString()
                 };
 
                 book.BookDetails.Add(bookDetail);
-            }
-
-        }
-
-        private void AddOrderItems(SqlDataReader reader, Book book)
-        {
-            if (reader["OrderItemId"] != DBNull.Value)
-            {
-                var orderItemId = Convert.ToInt32(reader["OrderItemId"]);
-
-                if (!book.OrderItems.Any(oi => oi.Id == orderItemId))
-                {
-                    var orderItem = new OrderItem
-                    {
-                        Id = orderItemId,
-                        Quantity = Convert.ToInt32(reader["Quantity"]),
-                        Price = Convert.ToDecimal(reader["OrderItemPrice"])
-                    };
-
-                    book.OrderItems.Add(orderItem);
-                }
             }
         }
 
@@ -266,28 +251,13 @@ namespace Store.Data.Repositories
             {
                 using SqlCommand insertDetailCommand = new(SqlConstants.BookDetailSqlConstants.INSERT_BOOKDETAIL, connection);
 
-                insertDetailCommand.Parameters.AddWithValue("@BookId", bookId);
-                insertDetailCommand.Parameters.AddWithValue("@Language", detail.Language);
-                insertDetailCommand.Parameters.AddWithValue("@PageCount", detail.PageCount);
-                insertDetailCommand.Parameters.AddWithValue("@Publisher", detail.Publisher);
+                insertDetailCommand.Parameters.AddWithValue($"@{nameof(detail.BookId)}", bookId);
+                insertDetailCommand.Parameters.AddWithValue($"@{nameof(detail.Language)}", detail.Language);
+                insertDetailCommand.Parameters.AddWithValue($"@{nameof(detail.PageCount)}", detail.PageCount);
+                insertDetailCommand.Parameters.AddWithValue($"@{nameof(detail.Publisher)}", detail.Publisher);
 
                 await insertDetailCommand.ExecuteNonQueryAsync();
             }
-        }
-    }
-
-    abstract class BookMapper
-    {
-        public static Book ReaderToBook(SqlDataReader reader)
-        {
-            return new Book
-            {
-                Id = Convert.ToInt32(reader["Id"]),
-                Name = reader["Name"].ToString(),
-                Description = reader["Description"].ToString(),
-                Price = Convert.ToDecimal(reader["Price"]),
-                PublishedDate = Convert.ToDateTime(reader["PublishedDate"])
-            };
         }
     }
 }

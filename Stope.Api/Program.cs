@@ -1,4 +1,5 @@
 using Stope.Api.MapperConfiguration;
+using Stope.Api.Models;
 using Store.Business;
 using Store.Business.MapperConfiguration;
 

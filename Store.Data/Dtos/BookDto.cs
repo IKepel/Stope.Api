@@ -10,6 +10,6 @@
         public List<AuthorDto> Authors { get; set; } = new List<AuthorDto>();
         public List<CategoryDto> Categories { get; set; } = new List<CategoryDto>();
         public List<BookDetailDto> BookDetails { get; set; } = new List<BookDetailDto>();
-        public List<OrderItemDto> OrderItems { get; set; } = new List<OrderItemDto>();
+        //public List<OrderItemDto> OrderItems { get; set; } = new List<OrderItemDto>();
     }
 }

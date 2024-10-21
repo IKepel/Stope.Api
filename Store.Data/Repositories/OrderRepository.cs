@@ -1,6 +1,7 @@
 ﻿using Microsoft.Data.SqlClient;
 using Store.Data.Entities;
 using Store.Data.Repositories.Iterfaces;
+using System.Runtime.InteropServices.Marshalling;
 
 namespace Store.Data.Repositories
 {
@@ -20,29 +21,28 @@ namespace Store.Data.Repositories
             using SqlConnection connection = new(_connectionString);
             using SqlCommand command = new(sql, connection);
 
-            command.Parameters.AddWithValue("@OrderDate", order.OrderDate);
-            command.Parameters.AddWithValue("@TotalAmount", order.TotalAmount);
-            command.Parameters.AddWithValue("@UserId", order.UserId);
+            command.Parameters.AddWithValue($"@{nameof(order.OrderDate)}", order.OrderDate);
+            command.Parameters.AddWithValue($"@{nameof(order.TotalAmount)}", order.TotalAmount);
+            command.Parameters.AddWithValue($"@{nameof(order.UserId)}", order.UserId);
 
             await connection.OpenAsync();
 
-            int newOrderId = (int)await command.ExecuteScalarAsync();
+            int orderId = (int)await command.ExecuteScalarAsync();
 
             foreach (var orderitem in order.OrderItems)
             {
                 string sqlOrderItem = "INSERT INTO OrderItems(Id, OrderId, BookId, Price, Quantity) VALUES (@Id, @OrderId, @BookId, @Price, @Quantity)";
                 using SqlCommand orderItemCommand = new(sqlOrderItem, connection);
 
-                orderItemCommand.Parameters.AddWithValue("@Id", orderitem.Id);
-                orderItemCommand.Parameters.AddWithValue("@OrderId", newOrderId);
-                orderItemCommand.Parameters.AddWithValue("@BookId", orderitem.BookId);
-                orderItemCommand.Parameters.AddWithValue("@Price", orderitem.Price);
-                orderItemCommand.Parameters.AddWithValue("@Quantity", orderitem.Quantity);
+                orderItemCommand.Parameters.AddWithValue($"@{nameof(orderitem.OrderId)}", orderId);
+                orderItemCommand.Parameters.AddWithValue($"@{nameof(orderitem.BookId)}", orderitem.BookId);
+                orderItemCommand.Parameters.AddWithValue($"@{nameof(orderitem.Price)}", orderitem.Price);
+                orderItemCommand.Parameters.AddWithValue($"@{nameof(orderitem.Quantity)}", orderitem.Quantity);
 
                 await orderItemCommand.ExecuteNonQueryAsync();
             }
 
-            return newOrderId;
+            return orderId;
         }
 
         public async Task<int> Delete(int id)
@@ -75,21 +75,18 @@ namespace Store.Data.Repositories
 
             using SqlDataReader reader = await command.ExecuteReaderAsync();
 
-            if (!await reader.ReadAsync())
-                return null;
-
-            var order = new Order
-            {
-                Id = Convert.ToInt32(reader["OrderId"]),
-                OrderDate = Convert.ToDateTime(reader["OrderDate"]),
-                TotalAmount = Convert.ToDecimal(reader["TotalAmount"]),
-                UserId = Convert.ToInt32(reader["UserId"])
-            };
-
-            AddOrderItem(reader, order);
+            var order = new Order();
 
             while (await reader.ReadAsync())
             {
+                if (order.Id == 0)
+                {
+                    order.Id = Convert.ToInt32(reader["OrderId"]);
+                    order.OrderDate = Convert.ToDateTime(reader[$"{nameof(order.OrderDate)}"]);
+                    order.TotalAmount = Convert.ToDecimal(reader[$"{nameof(order.TotalAmount)}"]);
+                    order.UserId = Convert.ToInt32(reader[$"{nameof(order.UserId)}"]);
+                }
+
                 AddOrderItem(reader, order);
             }
 
@@ -121,9 +118,9 @@ namespace Store.Data.Repositories
                     order = new Order
                     {
                         Id = orderId,
-                        OrderDate = Convert.ToDateTime(reader["OrderDate"]),
-                        TotalAmount = Convert.ToDecimal(reader["TotalAmount"]),
-                        UserId = Convert.ToInt32(reader["UserId"]),
+                        OrderDate = Convert.ToDateTime(reader[$"{nameof(order.OrderDate)}"]),
+                        TotalAmount = Convert.ToDecimal(reader[$"{nameof(order.TotalAmount)}"]),
+                        UserId = Convert.ToInt32(reader[$"{nameof(order.UserId)}"]),
                     };
 
                     orders.Add(orderId, order);
@@ -142,10 +139,10 @@ namespace Store.Data.Repositories
             using SqlConnection connection = new(_connectionString);
             using SqlCommand command = new(sql, connection);
 
-            command.Parameters.AddWithValue("@Id", order.Id);
-            command.Parameters.AddWithValue("@OrderDate", order.OrderDate);
-            command.Parameters.AddWithValue("@TotalAmount", order.TotalAmount);
-            command.Parameters.AddWithValue("@UserId", order.UserId);
+            command.Parameters.AddWithValue($"@{nameof(order.Id)}", order.Id);
+            command.Parameters.AddWithValue($"@{nameof(order.OrderDate)}", order.OrderDate);
+            command.Parameters.AddWithValue($"@{nameof(order.TotalAmount)}", order.TotalAmount);
+            command.Parameters.AddWithValue($"@{nameof(order.UserId)}", order.UserId);
 
             await connection.OpenAsync();
 
@@ -164,11 +161,10 @@ namespace Store.Data.Repositories
                 string sqlOrderItem = "INSERT INTO OrderItems(Id, OrderId, BookId, Price, Quantity) VALUES (@Id, @OrderId, @BookId, @Price, @Quantity)";
                 using SqlCommand orderItemCommand = new(sqlOrderItem, connection);
 
-                orderItemCommand.Parameters.AddWithValue("@Id", orderitem.Id);
-                orderItemCommand.Parameters.AddWithValue("@OrderId", order.Id);
-                orderItemCommand.Parameters.AddWithValue("@BookId", orderitem.BookId);
-                orderItemCommand.Parameters.AddWithValue("@Price", orderitem.Price);
-                orderItemCommand.Parameters.AddWithValue("@Quantity", orderitem.Quantity);
+                orderItemCommand.Parameters.AddWithValue($"@{nameof(orderitem.OrderId)}", order.Id);
+                orderItemCommand.Parameters.AddWithValue($"@{nameof(orderitem.BookId)}", orderitem.BookId);
+                orderItemCommand.Parameters.AddWithValue($"@{nameof(orderitem.Price)}", orderitem.Price);
+                orderItemCommand.Parameters.AddWithValue($"@{nameof(orderitem.Quantity)}", orderitem.Quantity);
 
                 await orderItemCommand.ExecuteNonQueryAsync();
             }
@@ -187,9 +183,9 @@ namespace Store.Data.Repositories
                 var orderItem = new OrderItem
                 {
                     Id = orderItemId,
-                    Quantity = Convert.ToInt32(reader["Quantity"]),
-                    Price = Convert.ToDecimal(reader["Price"]),
-                    BookId = Convert.ToInt32(reader["BookId"])
+                    Quantity = Convert.ToInt32(reader[$"{nameof(OrderItem.Quantity)}"]),
+                    Price = Convert.ToDecimal(reader[$"{nameof(OrderItem.Price)}"]),
+                    BookId = Convert.ToInt32(reader[$"{nameof(OrderItem.BookId)}"])
                 };
 
                 order.OrderItems.Add(orderItem);
