@@ -1,262 +1,327 @@
 ﻿using Microsoft.Data.SqlClient;
-using Store.Data.Constants;
+using Store.Data.Dtos;
 using Store.Data.Entities;
 using Store.Data.Repositories.Iterfaces;
+using System.Data;
+using System.Text;
 
 namespace Store.Data.Repositories
 {
-    public class BookRepository : IBookRepository
+    public class BookRepository : BaseRepository, IBookRepository
     {
-        private readonly string _connectionString;
+        public BookRepository(IDbConnection dbConnection) : base(dbConnection) { }
 
-        public BookRepository(string connectionString)
+        public async Task<int?> Create(Book book)
         {
-            _connectionString = connectionString;
-        }
+            var insertBookSql = new StringBuilder(@"DECLARE @Id INT
+            INSERT INTO Books (Name, Description, Price, PublishedDate)
+            OUTPUT INSERTED.Id
+            VALUES (@Name, @Description, @Price, @PublishedDate)
+            SET @Id = SCOPE_IDENTITY()
+            ");
 
-        public async Task<int> Create(Book book)
-        {
-            using SqlConnection connection = new(_connectionString);
-            using SqlCommand command = new(SqlConstants.BookSqlConstants.INSERT_BOOK, connection);
+            AddAuthorInserts(book, insertBookSql);
+            AddCategoryInserts(book, insertBookSql);
+            AddBookDetailInserts(book, insertBookSql);
 
-            AddBookParameters(command, book);
+            try
+            {
+                await OpenConnectionAsync();
 
-            await connection.OpenAsync();
+                using var command = CreateCommand();
+                command.CommandText = insertBookSql.ToString();
 
-            int bookId = (int)await command.ExecuteScalarAsync();
+                AddParameter(command, nameof(Book.Name), book.Name);
+                AddParameter(command, nameof(Book.Description), book.Description);
+                AddParameter(command, nameof(Book.Price), book.Price);
+                AddParameter(command, nameof(Book.PublishedDate), book.PublishedDate);
 
-            await InsertAuthorsAsync(connection, book.Id, book.Authors);
+                AddAuthorParameters(book, command);
+                AddCategoryParameters(book, command);
+                AddBookDetailParameters(book, command);
 
-            await InsertCategoriesAsync(connection, book.Id, book.Categories);
+                var result = await ExecuteScalarAsync(command);
 
-            await InsertDetailsAsync(connection, book.Id, book.BookDetails);
-
-            return bookId;
+                return result is int id ? id : null;
+            }
+            finally
+            {
+                await CloseConnectionAsync();
+            }
         }
 
         public async Task<int> Delete(int id)
         {
-            using SqlConnection connection = new(_connectionString);
-            using SqlCommand command = new(SqlConstants.BookSqlConstants.DELETE_BOOK, connection);
+            var deleteBookQuery = "DELETE FROM Books WHERE Id = @Id";
 
-            command.Parameters.AddWithValue("@id", id);
-
-            await connection.OpenAsync();
-
-            return command.ExecuteNonQuery();
-        }
-
-        public async Task<Book> Get(int id)
-        {
-            using SqlConnection connection = new(_connectionString);
-            using SqlCommand command = new(SqlConstants.BookSqlConstants.GET_BOOK_BY_ID, connection);
-
-            command.Parameters.AddWithValue("@id", id);
-
-            await connection.OpenAsync();
-
-            using SqlDataReader reader = await command.ExecuteReaderAsync();
-
-            var book = new Book();
-
-            while (await reader.ReadAsync())
+            try
             {
-                if (book.Id == 0)
-                {
-                    book.Id = Convert.ToInt32(reader["Id"]);
-                    book.Name = reader[$"{nameof(book.Name)}"].ToString();
-                    book.Description = reader[$"{nameof(book.Description)}"].ToString();
-                    book.Price = Convert.ToDecimal(reader[$"{nameof(book.Price)}"]);
-                    book.PublishedDate = Convert.ToDateTime(reader[$"{nameof(book.PublishedDate)}"]);
-                }
+                await OpenConnectionAsync();
 
-                AddAuthors(reader, book);
+                using var command = CreateCommand();
+                command.CommandText = deleteBookQuery;
 
-                AddCategoties(reader, book);
+                AddParameter(command, nameof(Book.Id), id);
 
-                AddDetails(reader, book);
+                return await ExecuteNonQueryAsync(command);
             }
-
-            return book;
+            finally
+            {
+                await CloseConnectionAsync();
+            }
         }
 
-        public async Task<IEnumerable<Book>> Get()
+        public async Task<Book?> Get(int id)
         {
-            using SqlConnection connection = new(_connectionString);
-            using SqlCommand command = new(SqlConstants.BookSqlConstants.GET_ALL_BOOKS, connection);
+            var getBookByIdSql = @"SELECT 
+			                            b.Id, b.Name, b.Description, b.Price, b.PublishedDate,
+			                            d.Id AS DetailId, d.Language, d.PageCount, d.Publisher, 
+			                            c.Id AS CategoryId, c.Name AS CategoryName,
+			                            a.Id AS AuthorId, a.FirstName, a.LastName
+                                       FROM Books b
+				                       LEFT JOIN BookDetails d ON d.BookId = b.Id
+				                       LEFT JOIN BookCategory bc ON bc.BookId = b.Id
+				                       LEFT JOIN Categories c ON c.Id = bc.CategoryId
+                                       LEFT JOIN AuthorBook ab ON ab.BookId = b.Id
+                                       LEFT JOIN Authors a ON a.Id = ab.AuthorId
+                                       WHERE b.Id = @Id";
 
-            await connection.OpenAsync();
-
-            using SqlDataReader reader = await command.ExecuteReaderAsync();
-
-            var bookDictionary = new Dictionary<int, Book>();
-
-            while (await reader.ReadAsync())
+            try
             {
-                var bookId = Convert.ToInt32(reader["Id"]);
+                await OpenConnectionAsync();
 
-                if (!bookDictionary.TryGetValue(bookId, out var book))
+                using var command = CreateCommand();
+
+                command.CommandText = getBookByIdSql;
+
+                AddParameter(command, nameof(Book.Id), id);
+
+                using var reader = await ExecuteReaderAsync(command);
+
+                if (!((SqlDataReader)reader).HasRows)
+                    return null;
+
+                var bookDtos = new List<BookDto>();
+
+                while (await ((SqlDataReader)reader).ReadAsync())
                 {
-                    book = new Book
+                    var bookDto = new BookDto
                     {
-                        Id = bookId,
-                        Name = reader[$"{nameof(book.Name)}"].ToString(),
-                        Description = reader[$"{nameof(book.Description)}"].ToString(),
-                        Price = Convert.ToDecimal(reader[$"{nameof(book.Price)}"]),
-                        PublishedDate = Convert.ToDateTime(reader[$"{nameof(book.PublishedDate)}"]),
+                        Id = Convert.ToInt32(reader[nameof(BookDto.Id)]),
+                        Name = reader[nameof(BookDto.Name)].ToString()!,
+                        Description = reader[nameof(BookDto.Description)].ToString()!,
+                        Price = Convert.ToDecimal(reader[nameof(BookDto.Price)]),
+                        PublishedDate = Convert.ToDateTime(reader[nameof(BookDto.PublishedDate)]),
+                        AuthorId = Convert.ToInt32(reader[nameof(BookDto.AuthorId)]),
+                        FirstName = reader[nameof(BookDto.FirstName)].ToString()!,
+                        LastName = reader[nameof(BookDto.LastName)].ToString()!,
+                        CategoryId = Convert.ToInt32(reader[nameof(BookDto.CategoryId)]),
+                        CategoryName = reader[nameof(BookDto.CategoryName)].ToString()!,
+                        DetailId = Convert.ToInt32(reader[nameof(BookDto.DetailId)]),
+                        Language = reader[nameof(BookDto.Language)].ToString()!,
+                        PageCount = Convert.ToInt32(reader[nameof(BookDto.PageCount)]),
+                        Publisher = reader[nameof(BookDto.Publisher)].ToString()!
                     };
 
-                    bookDictionary.Add(bookId, book);
+                    bookDtos.Add(bookDto);
                 }
 
-                AddAuthors(reader, book);
-
-                AddCategoties(reader, book);
-
-                AddDetails(reader, book);
-            }
-
-            return bookDictionary.Values;
-        }
-
-        public async Task<Book> Update(Book book)
-        {
-            using SqlConnection connection = new(_connectionString);
-            using SqlCommand command = new(SqlConstants.BookSqlConstants.UPDATE_BOOK, connection);
-
-            command.Parameters.AddWithValue("@Id", book.Id);
-            AddBookParameters(command, book);
-
-            await connection.OpenAsync();
-
-            await command.ExecuteNonQueryAsync();
-
-            using SqlCommand deleteAuthorBookCommand = new(SqlConstants.AuthorBookSqlConstants.DELETE, connection);
-
-            deleteAuthorBookCommand.Parameters.AddWithValue("@BookId", book.Id);
-
-            await deleteAuthorBookCommand.ExecuteNonQueryAsync();
-
-            await InsertAuthorsAsync(connection, book.Id, book.Authors);
-
-            using SqlCommand deleteBookCategoryCommand = new(SqlConstants.BookCategorySqlConstants.DELETE, connection);
-
-            deleteBookCategoryCommand.Parameters.AddWithValue("@BookId", book.Id);
-
-            await deleteBookCategoryCommand.ExecuteNonQueryAsync();
-
-            await InsertCategoriesAsync(connection, book.Id, book.Categories);
-
-            using SqlCommand deleteDatailCommand = new(SqlConstants.BookDetailSqlConstants.DELETE_BOOKDETAIL, connection);
-
-            deleteDatailCommand.Parameters.AddWithValue("@BookId", book.Id);
-
-            await deleteDatailCommand.ExecuteNonQueryAsync();
-
-            await InsertDetailsAsync(connection, book.Id, book.BookDetails);
-
-            book = await Get(book.Id);
-
-            return book;
-        }
-
-        private void AddBookParameters(SqlCommand command, Book book)
-        {
-            command.Parameters.AddWithValue($"@{nameof(book.Name)}", book.Name);
-            command.Parameters.AddWithValue($"@{nameof(book.Description)}", book.Description);
-            command.Parameters.AddWithValue($"@{nameof(book.Price)}", book.Price);
-            command.Parameters.AddWithValue($"@{nameof(book.PublishedDate)}", book.PublishedDate);
-        }
-
-        private void AddAuthors(SqlDataReader reader, Book book)
-        {
-            var authorId = Convert.ToInt32(reader["AuthorId"]);
-
-            if (!book.Authors.Any(a => a.Id == authorId))
-            {
-                var author = new Author
+                var book = new Book
                 {
-                    Id = authorId,
-                    FirstName = reader[$"{nameof(Author.FirstName)}"].ToString(),
-                    LastName = reader[$"{nameof(Author.LastName)}"].ToString()
+                    Id = bookDtos.First().Id,
+                    Name = bookDtos.First().Name,
+                    Description = bookDtos.First().Description,
+                    Price = bookDtos.First().Price,
+                    PublishedDate = bookDtos.First().PublishedDate,
+                    Categories = bookDtos.GroupBy(x => x.CategoryId)
+                    .Select(group => new Category
+                    {
+                        Id = group.Key,
+                        Name = group.First().CategoryName
+                    }).ToList(),
+                    Authors = bookDtos.GroupBy(x => x.AuthorId)
+                    .Select(group => new Author
+                    {
+                        Id = group.Key,
+                        FirstName = group.First().FirstName,
+                        LastName = group.First().LastName
+                    }).ToList(),
+                    BookDetails = bookDtos.GroupBy(x => x.DetailId)
+                    .Select(group => new BookDetail
+                    {
+                        Id = group.Key,
+                        Language = group.First().Language,
+                        PageCount = group.First().PageCount,
+                        Publisher = group.First().Publisher
+                    }).ToList()
                 };
 
-                book.Authors.Add(author);
+                return book;
+            }
+            finally
+            {
+                await CloseConnectionAsync();
             }
         }
 
-        private void AddCategoties(SqlDataReader reader, Book book)
+        public async Task<IEnumerable<BookDto>> Get()
         {
-            var categoryId = Convert.ToInt32(reader["CategoryId"]);
+            var getAllBooksQuery = @"SELECT 
+			        b.Id, b.Name, b.Description, b.Price, b.PublishedDate,
+			        d.Id AS DetailId, d.Language, d.PageCount, d.Publisher, 
+			        c.Id AS CategoryId, c.Name AS CategoryName,
+			        a.Id AS AuthorId, a.FirstName, a.LastName
+                FROM Books b
+				LEFT JOIN BookDetails d ON d.BookId = b.Id
+				LEFT JOIN BookCategory bc ON bc.BookId = b.Id
+				LEFT JOIN Categories c ON c.Id = bc.CategoryId
+                LEFT JOIN AuthorBook ab ON ab.BookId = b.Id
+                LEFT JOIN Authors a ON a.Id = ab.AuthorId";
 
-            if (!book.Categories.Any(c => c.Id == categoryId))
+            try
             {
-                var category = new Category
+                await OpenConnectionAsync();
+
+                using var command = CreateCommand();
+
+                command.CommandText = getAllBooksQuery;
+
+                using var reader = await ExecuteReaderAsync(command);
+
+                var bookDtos = new List<BookDto>();
+
+                while (await ((SqlDataReader)reader).ReadAsync())
                 {
-                    Id = categoryId,
-                    Name = reader[$"Category{nameof(Category.Name)}"].ToString()
-                };
+                    var bookDto = new BookDto
+                    {
+                        Id = Convert.ToInt32(reader[nameof(Book.Id)]),
+                        Name = reader[nameof(BookDto.Name)].ToString()!,
+                        Description = reader[nameof(BookDto.Description)].ToString()!,
+                        Price = Convert.ToDecimal(reader[nameof(BookDto.Price)]),
+                        PublishedDate = Convert.ToDateTime(reader[nameof(BookDto.PublishedDate)]),
+                        AuthorId = Convert.ToInt32(reader[nameof(BookDto.AuthorId)]),
+                        FirstName = reader[nameof(BookDto.FirstName)].ToString()!,
+                        LastName = reader[nameof(BookDto.LastName)].ToString()!,
+                        CategoryId = Convert.ToInt32(reader[nameof(BookDto.CategoryId)]),
+                        CategoryName = reader[nameof(BookDto.CategoryName)].ToString()!,
+                        DetailId = Convert.ToInt32(reader[nameof(BookDto.DetailId)]),
+                        Language = reader[nameof(BookDto.Language)].ToString()!,
+                        PageCount = Convert.ToInt32(reader[nameof(BookDto.PageCount)]),
+                        Publisher = reader[nameof(BookDto.Publisher)].ToString()!
+                    };
 
-                book.Categories.Add(category);
+                    bookDtos.Add(bookDto);
+                }
+
+                return bookDtos;
+            }
+            finally
+            {
+                await CloseConnectionAsync();
             }
         }
 
-        private void AddDetails(SqlDataReader reader, Book book)
+        public async Task<Book?> Update(Book book)
         {
-            var detailId = Convert.ToInt32(reader["DetailId"]);
+            var updateBookSql = new StringBuilder(@"UPDATE Books SET Name = @Name, Description = @Description, 
+                                              Price = @Price, PublishedDate = @PublishedDate WHERE Id = @Id
+             ");
 
-            if (!book.BookDetails.Any(d => d.Id == detailId))
+            updateBookSql.AppendLine("DELETE FROM AuthorBook WHERE BookId = @Id");
+            updateBookSql.AppendLine("DELETE FROM BookCategory WHERE BookId = @Id");
+            updateBookSql.AppendLine("DELETE FROM BookDetails WHERE BookId = @Id");
+
+            AddAuthorInserts(book, updateBookSql);
+            AddCategoryInserts(book, updateBookSql);
+            AddBookDetailInserts(book, updateBookSql);
+
+            try
             {
-                var bookDetail = new BookDetail
-                {
-                    Id = detailId,
-                    Language = reader[$"{nameof(BookDetail.Language)}"].ToString(),
-                    PageCount = Convert.ToInt32(reader[$"{nameof(BookDetail.PageCount)}"]),
-                    Publisher = reader[$"{nameof(BookDetail.Publisher)}"].ToString()
-                };
+                await OpenConnectionAsync();
 
-                book.BookDetails.Add(bookDetail);
+                using var command = CreateCommand();
+                command.CommandText = updateBookSql.ToString();
+
+                AddParameter(command, nameof(Book.Id), book.Id);
+                AddParameter(command, nameof(Book.Name), book.Name);
+                AddParameter(command, nameof(Book.Description), book.Description);
+                AddParameter(command, nameof(Book.Price), book.Price);
+                AddParameter(command, nameof(Book.PublishedDate), book.PublishedDate);
+
+                AddAuthorParameters(book, command);
+                AddCategoryParameters(book, command);
+                AddBookDetailParameters(book, command);
+
+                await ExecuteNonQueryAsync(command);
+
+                var updatedBook = await Get(book.Id);
+
+                return updatedBook;
+            }
+            finally
+            {
+                await CloseConnectionAsync();
             }
         }
 
-        private async Task InsertAuthorsAsync(SqlConnection connection, int bookId, List<Author> authors)
+        private void AddAuthorInserts(Book book, StringBuilder sqlBuilder)
         {
-            foreach (var author in authors)
+            var paramIndex = 0;
+            foreach (var author in book.Authors)
             {
-                using SqlCommand insertAuthorBookCommand = new(SqlConstants.AuthorBookSqlConstants.INSERT, connection);
-
-                insertAuthorBookCommand.Parameters.AddWithValue("@BookId", bookId);
-                insertAuthorBookCommand.Parameters.AddWithValue("@AuthorId", author.Id);
-
-                await insertAuthorBookCommand.ExecuteNonQueryAsync();
+                sqlBuilder.AppendLine($@"INSERT INTO AuthorBook (BookId, AuthorId)
+                                    VALUES (@Id, @AuthorId{paramIndex++});");
             }
         }
 
-        private async Task InsertCategoriesAsync(SqlConnection connection, int bookId, List<Category> categories)
+        private void AddCategoryInserts(Book book, StringBuilder sqlBuilder)
         {
-            foreach (var category in categories)
+            var paramIndex = 0;
+            foreach (var category in book.Categories)
             {
-                using SqlCommand insertBookCategoryCommand = new(SqlConstants.BookCategorySqlConstants.INSERT, connection);
-
-                insertBookCategoryCommand.Parameters.AddWithValue("@BookId", bookId);
-                insertBookCategoryCommand.Parameters.AddWithValue("@CategoryId", category.Id);
-
-                await insertBookCategoryCommand.ExecuteNonQueryAsync();
+                sqlBuilder.AppendLine($@" INSERT INTO BookCategory (BookId, CategoryId)
+                                                VALUES (@Id, @CategoryId{paramIndex++});");
             }
         }
 
-        private async Task InsertDetailsAsync(SqlConnection connection, int bookId, List<BookDetail> bookDetails)
+        private void AddBookDetailInserts(Book book, StringBuilder sqlBuilder)
         {
-            foreach (var detail in bookDetails)
+            var paramIndex = 0;
+            foreach (var bookDetail in book.BookDetails)
             {
-                using SqlCommand insertDetailCommand = new(SqlConstants.BookDetailSqlConstants.INSERT_BOOKDETAIL, connection);
+                sqlBuilder.AppendLine($@"INSERT INTO BookDetails (BookId, Language, PageCount, Publisher)
+                    VALUES (@Id, @Language{paramIndex}, @PageCount{paramIndex}, @Publisher{paramIndex});");
+                paramIndex++;
+            }
+        }
 
-                insertDetailCommand.Parameters.AddWithValue($"@{nameof(detail.BookId)}", bookId);
-                insertDetailCommand.Parameters.AddWithValue($"@{nameof(detail.Language)}", detail.Language);
-                insertDetailCommand.Parameters.AddWithValue($"@{nameof(detail.PageCount)}", detail.PageCount);
-                insertDetailCommand.Parameters.AddWithValue($"@{nameof(detail.Publisher)}", detail.Publisher);
+        private void AddAuthorParameters(Book book, IDbCommand command)
+        {
+            var paramIndex = 0;
+            foreach (var author in book.Authors)
+            {
+                AddParameter(command, $"@{nameof(BookDto.AuthorId)}{paramIndex++}", author.Id);
+            }
+        }
 
-                await insertDetailCommand.ExecuteNonQueryAsync();
+        private void AddCategoryParameters(Book book, IDbCommand command)
+        {
+            var paramIndex = 0;
+            foreach (var category in book.Categories)
+            {
+                AddParameter(command, $"@{nameof(BookDto.CategoryId)}{paramIndex++}", category.Id);
+            }
+        }
+
+        private void AddBookDetailParameters(Book book, IDbCommand command)
+        {
+            var paramIndex = 0;
+            foreach (var bookDetail in book.BookDetails)
+            {
+                AddParameter(command, $"@{nameof(BookDto.Language)}{paramIndex}", bookDetail.Language);
+                AddParameter(command, $"@{nameof(BookDto.PageCount)}{paramIndex}", bookDetail.PageCount);
+                AddParameter(command, $"@{nameof(BookDto.Publisher)}{paramIndex}", bookDetail.Publisher);
+                paramIndex++;
             }
         }
     }

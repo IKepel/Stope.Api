@@ -21,7 +21,7 @@ namespace Stope.Api.Controllers
         }
 
         [HttpPost]
-        public async Task<int> Create([FromBody] BookRequestModel book)
+        public async Task<int?> Create([FromBody] BookRequestModel book)
         {
             var model = _mapper.Map<BookModel>(book);
 
@@ -29,29 +29,33 @@ namespace Stope.Api.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<BookViewModel> Get(int id)
+        public async Task<BookViewModel?> Get(int id)
         {
-            var bookDto = await _bookService.Get(id);
+            var model = await _bookService.Get(id);
 
-            var model = _mapper.Map<BookViewModel>(bookDto);
-            model.Status = 1;
+            var viewModel = _mapper.Map<BookViewModel?>(model);
 
-            return model;
+            if (viewModel != null)
+            {
+                viewModel.Status = 1;
+            }
+
+            return viewModel;
         }
 
         [HttpGet]
         public async Task<IEnumerable<BookViewModel>> Get()
         {
-            var bookDtos = await _bookService.Get();
+            var models = await _bookService.Get();
 
-            var models = _mapper.Map<IEnumerable<BookViewModel>>(bookDtos);
+            var viewModels = _mapper.Map<IEnumerable<BookViewModel>>(models);
 
-            foreach (var model in models)
+            foreach (var model in viewModels)
             {
                 model.Status = 1;
             }
 
-            return models;
+            return viewModels;
         }
 
         [HttpDelete("{id}")]

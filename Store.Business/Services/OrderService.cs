@@ -1,7 +1,6 @@
 ﻿using AutoMapper;
 using Store.Business.Models.Orders;
 using Store.Business.Services.Interfaces;
-using Store.Data.Dtos;
 using Store.Data.Entities;
 using Store.Data.Repositories.Iterfaces;
 
@@ -18,7 +17,7 @@ namespace Store.Business.Services
             _mapper = mapper;
         }
 
-        public async Task<int> Create(OrderModel orderModel)
+        public async Task<int?> Create(OrderModel orderModel)
         {
             var order = _mapper.Map<Order>(orderModel);
 
@@ -30,31 +29,58 @@ namespace Store.Business.Services
             return await _orderRepository.Delete(id);
         }
 
-        public async Task<OrderDto> Get(int id)
+        public async Task<OrderModel?> Get(int id)
         {
             var order = await _orderRepository.Get(id);
 
-            var orderDto = _mapper.Map<OrderDto>(order);
+            var model = _mapper.Map<OrderModel?>(order);
 
-            return orderDto;
+            return model;
         }
 
-        public async Task<IEnumerable<OrderDto>> Get()
+        public async Task<IEnumerable<OrderModel>> Get()
         {
-            var orders = await _orderRepository.Get();
+            var orderDtos = await _orderRepository.Get();
 
-            var orderDtos = _mapper.Map<IEnumerable<OrderDto>>(orders);
+            var ordersGrouped = orderDtos.GroupBy(o => o.Id).
+                Select(group => new Order
+                {
+                    Id = group.Key,
+                    OrderDate = group.First().OrderDate,
+                    TotalAmount = group.First().TotalAmount,
+                    UserId = group.First().UserId,
+                    User = new User
+                    {
+                        FirstName = group.First().FirstName,
+                        LastName = group.First().LastName,
+                        Email = group.First().Email
+                    },
+                    OrderItems = group.GroupBy(oi => oi.OrderItemId)
+                    .Select(orderItemGroup => new OrderItem
+                    {
+                        Id = orderItemGroup.Key,
+                        BookId = orderItemGroup.First().BookId,
+                        Book = new Book
+                        {
+                            Name = orderItemGroup.First().BookName
+                        },
+                        Price = orderItemGroup.First().Price,
+                        Quantity = orderItemGroup.First().Quantity
+                    }).ToList()
+                });
 
-            return orderDtos;
+            var models = _mapper.Map<IEnumerable<OrderModel>>(ordersGrouped);
+
+            return models;
         }
 
-        public async Task<OrderDto> Update(OrderModel orderModel)
+        public async Task<OrderModel?> Update(OrderModel orderModel)
         {
             var order = _mapper.Map<Order>(orderModel);
 
             order = await _orderRepository.Update(order);
 
-            var model = _mapper.Map<OrderDto>(order);
+            var model = _mapper.Map<OrderModel>(order);
 
             return model;
         }

@@ -7,9 +7,14 @@
         public string Description { get; set; }
         public decimal Price { get; set; }
         public DateTime PublishedDate { get; set; }
-        public List<AuthorDto> Authors { get; set; } = new List<AuthorDto>();
-        public List<CategoryDto> Categories { get; set; } = new List<CategoryDto>();
-        public List<BookDetailDto> BookDetails { get; set; } = new List<BookDetailDto>();
-        //public List<OrderItemDto> OrderItems { get; set; } = new List<OrderItemDto>();
+        public int AuthorId { get; set; }
+        public string FirstName { get; set; }
+        public string LastName { get; set; }
+        public int CategoryId { get; set; }
+        public string CategoryName { get; set; }
+        public int DetailId { get; set; }
+        public string Language {  get; set; }
+        public int PageCount { get; set; }
+        public string Publisher {  get; set; }
     }
 }

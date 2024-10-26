@@ -21,7 +21,7 @@ namespace Stope.Api.Controllers
         }
 
         [HttpPost]
-        public async Task<int> Create([FromBody] OrderRequestModel order)
+        public async Task<int?> Create([FromBody] OrderRequestModel order)
         {
             var model = _mapper.Map<OrderModel>(order);
 
@@ -29,29 +29,33 @@ namespace Stope.Api.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<OrderViewModel> Get(int id)
+        public async Task<OrderViewModel?> Get(int id)
         {
-            var orderDto = await _orderService.Get(id);
+            var model = await _orderService.Get(id);
 
-            var model = _mapper.Map<OrderViewModel>(orderDto);
-            model.Status = 1;
+            var viewModel = _mapper.Map<OrderViewModel>(model);
 
-            return model;
+            if (viewModel != null)
+            {
+                viewModel.Status = 1;
+            }
+
+            return viewModel;
         }
 
         [HttpGet]
         public async Task<IEnumerable<OrderViewModel>> Get()
         {
-            var orderDtos = await _orderService.Get();
+            var models = await _orderService.Get();
 
-            var models = _mapper.Map<IEnumerable<OrderViewModel>>(orderDtos);
+            var viewModels = _mapper.Map<IEnumerable<OrderViewModel>>(models);
 
-            foreach (var model in models)
+            foreach (var model in viewModels)
             {
                 model.Status = 1;
             }
 
-            return models;
+            return viewModels;
         }
 
         [HttpDelete("{id}")]

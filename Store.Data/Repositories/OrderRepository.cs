@@ -1,194 +1,260 @@
 ﻿using Microsoft.Data.SqlClient;
+using Store.Data.Dtos;
 using Store.Data.Entities;
 using Store.Data.Repositories.Iterfaces;
-using System.Runtime.InteropServices.Marshalling;
+using System.Data;
+using System.Text;
 
 namespace Store.Data.Repositories
 {
-    public class OrderRepository : IOrderRepository
+    public class OrderRepository : BaseRepository, IOrderRepository
     {
-        private readonly string _connectionString;
+        public OrderRepository(IDbConnection dbConnection) : base(dbConnection) { }
 
-        public OrderRepository(string connectionString)
+        public async Task<int?> Create(Order order)
         {
-            _connectionString = connectionString;
-        }
+            var insertOrderSql = new StringBuilder(@"DECLARE @Id INT 
+                            INSERT INTO Orders(OrderDate, TotalAmount, UserId) OUTPUT INSERTED.Id 
+                            VALUES (@OrderDate, @TotalAmount, @UserId)
+                            SET @Id = SCOPE_IDENTITY()
+                            ");
 
-        public async Task<int> Create(Order order)
-        {
-            string sql = "INSERT INTO Orders(OrderDate,TotalAmount, UserId) OUTPUT INSERTED.Id VALUES (@OrderDate, @TotalAmount, @UserId)";
+            AddOrderItemInserts(order, insertOrderSql);
 
-            using SqlConnection connection = new(_connectionString);
-            using SqlCommand command = new(sql, connection);
-
-            command.Parameters.AddWithValue($"@{nameof(order.OrderDate)}", order.OrderDate);
-            command.Parameters.AddWithValue($"@{nameof(order.TotalAmount)}", order.TotalAmount);
-            command.Parameters.AddWithValue($"@{nameof(order.UserId)}", order.UserId);
-
-            await connection.OpenAsync();
-
-            int orderId = (int)await command.ExecuteScalarAsync();
-
-            foreach (var orderitem in order.OrderItems)
+            try
             {
-                string sqlOrderItem = "INSERT INTO OrderItems(Id, OrderId, BookId, Price, Quantity) VALUES (@Id, @OrderId, @BookId, @Price, @Quantity)";
-                using SqlCommand orderItemCommand = new(sqlOrderItem, connection);
+                await OpenConnectionAsync();
 
-                orderItemCommand.Parameters.AddWithValue($"@{nameof(orderitem.OrderId)}", orderId);
-                orderItemCommand.Parameters.AddWithValue($"@{nameof(orderitem.BookId)}", orderitem.BookId);
-                orderItemCommand.Parameters.AddWithValue($"@{nameof(orderitem.Price)}", orderitem.Price);
-                orderItemCommand.Parameters.AddWithValue($"@{nameof(orderitem.Quantity)}", orderitem.Quantity);
+                using var command = CreateCommand();
+                command.CommandText = insertOrderSql.ToString();
 
-                await orderItemCommand.ExecuteNonQueryAsync();
+                AddParameter(command, nameof(Order.OrderDate), order.OrderDate);
+                AddParameter(command, nameof(Order.TotalAmount), order.TotalAmount);
+                AddParameter(command, nameof(Order.UserId), order.UserId);
+
+                AddOrderItemParemeters(order, command);
+
+                var result = await ExecuteScalarAsync(command);
+
+                return result is int id ? id : null;
             }
-
-            return orderId;
+            finally
+            {
+                await CloseConnectionAsync();
+            }
         }
 
         public async Task<int> Delete(int id)
         {
-            string sql = "DELETE FROM Orders WHERE Id = @id";
+            string sql = "DELETE FROM Orders WHERE Id = @Id";
 
-            using SqlConnection connection = new(_connectionString);
-            using SqlCommand command = new(sql, connection);
-
-            command.Parameters.AddWithValue("@id", id);
-
-            await connection.OpenAsync();
-
-            return command.ExecuteNonQuery();
-        }
-
-        public async Task<Order> Get(int id)
-        {
-            string sql = @"SELECT o.Id AS OrderId, o.OrderDate, o.TotalAmount, o.UserId, oi.Id AS OrderItemId, oi.BookId, oi.Quantity, oi.Price
-                           FROM Orders o 
-                           LEFT JOIN OrderItems oi ON oi.OrderId = o.Id
-                           WHERE o.Id = @id";
-
-            using SqlConnection connection = new(_connectionString);
-            using SqlCommand command = new(sql, connection);
-
-            command.Parameters.AddWithValue("@id", id);
-
-            await connection.OpenAsync();
-
-            using SqlDataReader reader = await command.ExecuteReaderAsync();
-
-            var order = new Order();
-
-            while (await reader.ReadAsync())
+            try
             {
-                if (order.Id == 0)
-                {
-                    order.Id = Convert.ToInt32(reader["OrderId"]);
-                    order.OrderDate = Convert.ToDateTime(reader[$"{nameof(order.OrderDate)}"]);
-                    order.TotalAmount = Convert.ToDecimal(reader[$"{nameof(order.TotalAmount)}"]);
-                    order.UserId = Convert.ToInt32(reader[$"{nameof(order.UserId)}"]);
-                }
+                await OpenConnectionAsync();
 
-                AddOrderItem(reader, order);
+                using var command = CreateCommand();
+                command.CommandText = sql;
+
+                AddParameter(command, nameof(Order.Id), id);
+
+                return await ExecuteNonQueryAsync(command);
             }
-
-            return order;
+            finally
+            {
+                await CloseConnectionAsync();
+            }
         }
 
-        public async Task<IEnumerable<Order>> Get()
+        public async Task<Order?> Get(int id)
         {
-            string sql = @"SELECT o.Id AS OrderId, o.OrderDate, o.TotalAmount, o.UserId, 
-                                  oi.Id AS OrderItemId, oi.BookId, oi.Quantity, oi.Price
-                           FROM Orders o 
-                           LEFT JOIN OrderItems oi ON oi.OrderId = o.Id";
+            string getBookByIdSql = @"SELECT o.Id, o.OrderDate, o.TotalAmount, o.UserId,
+	                        u.FirstName, u.LastName, u.Email,
+	                        oi.Id AS OrderItemId, oi.BookId, b.Name AS BookName, oi.Quantity, oi.Price
+                          FROM Orders o 
+                          LEFT JOIN OrderItems oi ON oi.OrderId = o.Id
+                          LEFT JOIN Books b ON oi.BookId = b.Id
+                          LEFT JOIN Users u ON o.UserId = u.Id
+                          WHERE o.Id = @Id";
 
-            using SqlConnection connection = new(_connectionString);
-            using SqlCommand command = new(sql, connection);
 
-            await connection.OpenAsync();
-
-            using SqlDataReader reader = await command.ExecuteReaderAsync();
-
-            var orders = new Dictionary<int, Order>();
-
-            while (await reader.ReadAsync())
+            try
             {
-                var orderId = Convert.ToInt32(reader["OrderId"]);
+                await OpenConnectionAsync();
 
-                if (!orders.TryGetValue(orderId, out var order))
+                using var command = CreateCommand();
+                command.CommandText = getBookByIdSql;
+
+                AddParameter(command, nameof(Order.Id), id);
+
+                using var reader = await ExecuteReaderAsync(command);
+
+                if (!((SqlDataReader)reader).HasRows)
+                    return null;
+
+                var orderDtos = new List<OrderDto>();
+
+                while (await ((SqlDataReader)reader).ReadAsync())
                 {
-                    order = new Order
+                    var orderDto = new OrderDto
                     {
-                        Id = orderId,
-                        OrderDate = Convert.ToDateTime(reader[$"{nameof(order.OrderDate)}"]),
-                        TotalAmount = Convert.ToDecimal(reader[$"{nameof(order.TotalAmount)}"]),
-                        UserId = Convert.ToInt32(reader[$"{nameof(order.UserId)}"]),
+                        Id = Convert.ToInt32(reader[nameof(OrderDto.Id)]),
+                        OrderDate = Convert.ToDateTime(reader[nameof(OrderDto.OrderDate)]),
+                        TotalAmount = Convert.ToDecimal(reader[nameof(OrderDto.TotalAmount)]),
+                        UserId = Convert.ToInt32(reader[nameof(OrderDto.UserId)]),
+                        FirstName = reader[nameof(OrderDto.FirstName)].ToString()!,
+                        LastName = reader[nameof(OrderDto.LastName)].ToString()!,
+                        Email = reader[nameof(OrderDto.Email)].ToString()!,
+                        OrderItemId = Convert.ToInt32(reader[nameof(OrderDto.OrderItemId)]),
+                        BookId = Convert.ToInt32(reader[nameof(OrderDto.BookId)]),
+                        BookName = reader[nameof(OrderDto.BookName)].ToString()!,
+                        Price = Convert.ToDecimal(reader[nameof(OrderDto.Price)]),
+                        Quantity = Convert.ToInt32(reader[nameof(OrderDto.Quantity)])
                     };
 
-                    orders.Add(orderId, order);
+                    orderDtos.Add(orderDto);
                 }
 
-                AddOrderItem(reader, order);
-            }
-
-            return orders.Values;
-        }
-
-        public async Task<Order> Update(Order order)
-        {
-            string sql = "UPDATE Orders SET OrderDate = @OrderDate, TotalAmount = @TotalAmount, UserId = @UserId WHERE Id = @Id";
-
-            using SqlConnection connection = new(_connectionString);
-            using SqlCommand command = new(sql, connection);
-
-            command.Parameters.AddWithValue($"@{nameof(order.Id)}", order.Id);
-            command.Parameters.AddWithValue($"@{nameof(order.OrderDate)}", order.OrderDate);
-            command.Parameters.AddWithValue($"@{nameof(order.TotalAmount)}", order.TotalAmount);
-            command.Parameters.AddWithValue($"@{nameof(order.UserId)}", order.UserId);
-
-            await connection.OpenAsync();
-
-            await command.ExecuteNonQueryAsync();
-
-            string deleteSql = "DELETE FROM OrderItems WHERE OrderId = @OrderId";
-
-            using SqlCommand deleteCommand = new(deleteSql, connection);
-
-            deleteCommand.Parameters.AddWithValue("@OrderId", order.Id);
-
-            await deleteCommand.ExecuteNonQueryAsync();
-
-            foreach (var orderitem in order.OrderItems)
-            {
-                string sqlOrderItem = "INSERT INTO OrderItems(Id, OrderId, BookId, Price, Quantity) VALUES (@Id, @OrderId, @BookId, @Price, @Quantity)";
-                using SqlCommand orderItemCommand = new(sqlOrderItem, connection);
-
-                orderItemCommand.Parameters.AddWithValue($"@{nameof(orderitem.OrderId)}", order.Id);
-                orderItemCommand.Parameters.AddWithValue($"@{nameof(orderitem.BookId)}", orderitem.BookId);
-                orderItemCommand.Parameters.AddWithValue($"@{nameof(orderitem.Price)}", orderitem.Price);
-                orderItemCommand.Parameters.AddWithValue($"@{nameof(orderitem.Quantity)}", orderitem.Quantity);
-
-                await orderItemCommand.ExecuteNonQueryAsync();
-            }
-
-            order = await Get(order.Id);
-
-            return order;
-        }
-
-        private void AddOrderItem(SqlDataReader reader, Order order)
-        {
-            var orderItemId = Convert.ToInt32(reader["OrderItemId"]);
-
-            if (!order.OrderItems.Any(oi => oi.Id == orderItemId))
-            {
-                var orderItem = new OrderItem
+                var order = new Order
                 {
-                    Id = orderItemId,
-                    Quantity = Convert.ToInt32(reader[$"{nameof(OrderItem.Quantity)}"]),
-                    Price = Convert.ToDecimal(reader[$"{nameof(OrderItem.Price)}"]),
-                    BookId = Convert.ToInt32(reader[$"{nameof(OrderItem.BookId)}"])
+                    Id = orderDtos.First().Id,
+                    OrderDate = orderDtos.First().OrderDate,
+                    TotalAmount = orderDtos.First().TotalAmount,
+                    UserId = orderDtos.First().UserId,
+                    User = new User
+                    {
+                        FirstName = orderDtos.First().FirstName,
+                        LastName = orderDtos.First().LastName,
+                        Email = orderDtos.First().Email,
+                    },
+                    OrderItems = orderDtos.GroupBy(oi => oi.OrderItemId)
+                    .Select(group => new OrderItem
+                    {
+                        Id = group.Key,
+                        BookId = group.First().BookId,
+                        Book = new Book
+                        {
+                            Name = group.First().BookName
+                        },
+                        Price = group.First().Price,
+                        Quantity = group.First().Quantity
+                    }).ToList()
                 };
 
-                order.OrderItems.Add(orderItem);
+                return order;
+            }
+            finally
+            {
+                await CloseConnectionAsync();
+            }
+        }
+
+        public async Task<IEnumerable<OrderDto>> Get()
+        {
+            string getAllBookSql = @"SELECT o.Id, o.OrderDate, o.TotalAmount, o.UserId,
+	                        u.FirstName, u.LastName, u.Email,
+	                        oi.Id AS OrderItemId, oi.BookId, b.Name AS BookName, oi.Quantity, oi.Price
+                          FROM Orders o 
+                          LEFT JOIN OrderItems oi ON oi.OrderId = o.Id
+                          LEFT JOIN Books b ON oi.BookId = b.Id
+                          LEFT JOIN Users u ON o.UserId = u.Id
+                          ";
+
+            try
+            {
+                await OpenConnectionAsync();
+
+                using var command = CreateCommand();
+                command.CommandText = getAllBookSql;
+
+                using var reader = await ExecuteReaderAsync(command);
+
+                var orderDtos = new List<OrderDto>();
+
+                while (await ((SqlDataReader)reader).ReadAsync())
+                {
+                    var orderDto = new OrderDto
+                    {
+                        Id = Convert.ToInt32(reader[nameof(OrderDto.Id)]),
+                        OrderDate = Convert.ToDateTime(reader[nameof(OrderDto.OrderDate)]),
+                        TotalAmount = Convert.ToDecimal(reader[nameof(OrderDto.TotalAmount)]),
+                        UserId = Convert.ToInt32(reader[nameof(OrderDto.UserId)]),
+                        FirstName = reader[nameof(OrderDto.FirstName)].ToString()!,
+                        LastName = reader[nameof(OrderDto.LastName)].ToString()!,
+                        Email = reader[nameof(OrderDto.Email)].ToString()!,
+                        OrderItemId = Convert.ToInt32(reader[nameof(OrderDto.OrderItemId)]),
+                        BookId = Convert.ToInt32(reader[nameof(OrderDto.BookId)]),
+                        BookName = reader[nameof(OrderDto.BookName)].ToString()!,
+                        Price = Convert.ToDecimal(reader[nameof(OrderDto.Price)]),
+                        Quantity = Convert.ToInt32(reader[nameof(OrderDto.Quantity)])
+                    };
+
+                    orderDtos.Add(orderDto);
+                }
+
+                return orderDtos;
+            }
+            finally
+            {
+                await CloseConnectionAsync();
+            }
+        }
+
+        public async Task<Order?> Update(Order order)
+        {
+            var updateOrderSql = new StringBuilder(@"UPDATE Orders SET OrderDate = @OrderDate, TotalAmount = @TotalAmount, UserId = @UserId 
+                                                    WHERE Id = @Id
+                                                    ");
+
+            updateOrderSql.AppendLine("DELETE FROM OrderItems WHERE OrderId = @Id");
+
+            AddOrderItemInserts(order, updateOrderSql);
+
+            try
+            {
+                await OpenConnectionAsync();
+
+                using var command = CreateCommand();
+                command.CommandText = updateOrderSql.ToString();
+
+                AddParameter(command, nameof(Order.Id), order.Id);
+                AddParameter(command, nameof(Order.OrderDate), order.OrderDate);
+                AddParameter(command, nameof(Order.TotalAmount), order.TotalAmount);
+                AddParameter(command, nameof(Order.UserId), order.UserId);
+
+                AddOrderItemParemeters(order, command);
+
+                await ExecuteNonQueryAsync(command);
+
+                var updatedOrder = await Get(order.Id);
+
+                return updatedOrder;
+            }
+            finally
+            {
+                await CloseConnectionAsync();
+            }
+        }
+
+        private void AddOrderItemInserts(Order order, StringBuilder builder)
+        {
+            var paramIndex = 0;
+            foreach (var item in order.OrderItems)
+            {
+                builder.AppendLine($@"INSERT INTO OrderItems(OrderId, BookId, Price, Quantity) 
+                                        VALUES (@Id, @BookId{paramIndex}, @Price{paramIndex}, @Quantity{paramIndex})");
+                paramIndex++;
+            }
+        }
+
+        private void AddOrderItemParemeters(Order order, IDbCommand command)
+        {
+            var paramIndex = 0;
+            foreach (var item in order.OrderItems)
+            {
+                AddParameter(command, $"{nameof(OrderItem.BookId)}{paramIndex}", item.BookId);
+                AddParameter(command, $"{nameof(OrderItem.Price)}{paramIndex}", item.Price);
+                AddParameter(command, $"{nameof(OrderItem.Quantity)}{paramIndex}", item.Quantity);
+                paramIndex++;
             }
         }
     }

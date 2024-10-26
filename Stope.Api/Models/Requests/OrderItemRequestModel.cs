@@ -6,9 +6,6 @@ namespace Stope.Api.Models.Requests
     public class OrderItemRequestModel
     {
         [Required]
-        public int Id { get; set; }
-
-        [Required]
         public int Quantity { get; set; }
 
         [Required]

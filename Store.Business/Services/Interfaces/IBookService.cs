@@ -5,13 +5,13 @@ namespace Store.Business.Services.Interfaces
 {
     public interface IBookService
     {
-        Task<BookDto> Get(int id);
+        Task<BookModel?> Get(int id);
 
-        Task<IEnumerable<BookDto>> Get();
+        Task<IEnumerable<BookModel>> Get();
 
-        Task<int> Create(BookModel bookModel);
+        Task<int?> Create(BookModel bookModel);
 
-        Task<BookDto> Update(BookModel bookModel);
+        Task<BookModel?> Update(BookModel bookModel);
 
         Task<int> Delete(int id);
     }

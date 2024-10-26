@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Store.Data.Repositories.Iterfaces;
 using Store.Data.Repositories;
+using System.Data;
+using Microsoft.Data.SqlClient;
 
 namespace Store.Data
 {
@@ -8,8 +10,10 @@ namespace Store.Data
     {
         public static void Configure(this IServiceCollection serviceCollection, string connectionString)
         {
-            serviceCollection.AddTransient<IOrderRepository>(provider => new OrderRepository(connectionString))
-                             .AddTransient<IBookRepository>(provider => new BookRepository(connectionString));
+            serviceCollection.AddTransient<IDbConnection>(_ => new SqlConnection(connectionString));
+
+            serviceCollection.AddTransient<IOrderRepository, OrderRepository>()
+                             .AddTransient<IBookRepository, BookRepository>();
         }
     }
 }

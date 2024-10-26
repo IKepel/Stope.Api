@@ -1,4 +1,6 @@
-﻿namespace Store.ViewModels.OrderItemViewModels
+﻿using Store.ViewModels.ProductViewModels;
+
+namespace Store.ViewModels.OrderItemViewModels
 {
     public class OrderItemViewModel
     {
@@ -6,5 +8,7 @@
         public int Quantity { get; set; }
         public decimal Price { get; set; }
         public int BookId { get; set; }
+
+        public BookViewModel Book { get; set; }
     }
 }

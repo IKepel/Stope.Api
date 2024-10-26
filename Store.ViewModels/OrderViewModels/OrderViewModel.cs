@@ -1,4 +1,5 @@
 ﻿using Store.ViewModels.OrderItemViewModels;
+using Store.ViewModels.UserViewModels;
 
 namespace Store.ViewModels.OrderViewModels
 {
@@ -11,6 +12,8 @@ namespace Store.ViewModels.OrderViewModels
         public decimal TotalAmount { get; set; }
 
         public int UserId { get; set; }
+
+        public UserViewModel User { get; set; }
 
         public List<OrderItemViewModel> OrderItems { get; set; }
 

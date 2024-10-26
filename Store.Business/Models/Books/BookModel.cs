@@ -1,4 +1,6 @@
-﻿using Store.Business.Models.BookDetails;
+﻿using Store.Business.Models.Authors;
+using Store.Business.Models.BookDetails;
+using Store.Business.Models.Categories;
 
 namespace Store.Business.Models.Books
 {
@@ -14,9 +16,9 @@ namespace Store.Business.Models.Books
 
         public DateTime PublishedDate { get; set; }
 
-        public List<int> AuthorIds { get; set; }
+        public List<AuthorModel> Authors { get; set; }
 
-        public List<int> CategoryIds { get; set; }
+        public List<CategoryModel> Categories { get; set; }
 
         public List<BookDetailModel> BookDetails { get; set; }
     }

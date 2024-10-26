@@ -1,6 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
-using System.ComponentModel.DataAnnotations;
-using Store.Business.Models.OrderItems;
+﻿using Store.Business.Models.OrderItems;
+using Store.Business.Models.Users;
 
 namespace Store.Business.Models.Orders
 {
@@ -13,6 +12,8 @@ namespace Store.Business.Models.Orders
         public decimal TotalAmount { get; set; }
 
         public int UserId { get; set; }
+
+        public UserModel User { get; set; }
 
         public List<OrderItemModel> OrderItems { get; set; }
     }

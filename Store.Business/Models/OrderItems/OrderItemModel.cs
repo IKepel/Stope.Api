@@ -1,4 +1,6 @@
-﻿namespace Store.Business.Models.OrderItems
+﻿using Store.Business.Models.Books;
+
+namespace Store.Business.Models.OrderItems
 {
     public class OrderItemModel
     {
@@ -9,5 +11,7 @@
         public decimal Price { get; set; }
 
         public int BookId { get; set; }
+
+        public BookModel Book { get; set; }
     }
 }

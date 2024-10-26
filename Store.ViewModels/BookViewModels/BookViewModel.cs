@@ -23,7 +23,7 @@ namespace Store.ViewModels.ProductViewModels
 
         public List<BookDetailViewModel> BookDetails { get; set; }
 
-        public List<OrderItemViewModel> OrderItems { get; set; }
+        //public List<OrderItemViewModel> OrderItems { get; set; }
 
         public int Status { get; set; }
     }
