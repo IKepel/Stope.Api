@@ -1,5 +1,5 @@
 using Stope.Api.MapperConfiguration;
-using Stope.Api.Models;
+using Stope.Api.Middleware;
 using Store.Business;
 using Store.Business.MapperConfiguration;
 
@@ -26,6 +26,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseMiddleware<ExceptionMiddleware>();
 
 app.UseHttpsRedirection();
 
